@@ -4,23 +4,22 @@
 将目标与本人的若干张图片、若干模型载入指定设备，
 指定一张图片（a）生成它的对抗样本，
 不断改变模型和目标人脸图片(b)，与（a）为同一人的图片（c);
-使用梯度下降法使得a,b的相似度变高;a与c的相似度变低。'''
+使用梯度下降法使得a,b的相似度变高;a与c的相似度变低。
+'''
 
 import time
 t1 = time.time()
 
-
 import random
 import torch
-from utils import *
-from utils import utils
-from utils import get_face
+from Utils import *
+from Utils import utils
+from Utils import get_face
 from model_irse import IR_50, IR_101, IR_152
 from model_resnet import ResNet_50, ResNet_101
-from utils.guass import *
+from Utils.guass import *
 import multiprocessing
-from utils import config
-
+from Utils import config
 
 # 二阶tv loss
 def tv_loss(input_t):
@@ -29,7 +28,6 @@ def tv_loss(input_t):
     temp = (input_t - temp1)**2 +  (input_t - temp2)**2
     return temp.sum()
 
-
 # 初始化干扰噪声
 def get_init_noise(device):
     noise = torch.Tensor(1, 3, 112, 112)
@@ -37,13 +35,11 @@ def get_init_noise(device):
     return noise.to(device)
     #print(noise.abs().mean())
 
-
 # 更换模型  
 def change_model(model_pool):
     s = len(model_pool)
     index = random.randint(0, s - 1)
     return model_pool[index]
-
 
 # 更换v2, v2是目标人脸的特征向量 512维
 def change_v2(crop_path_pool, model, device):
@@ -54,7 +50,6 @@ def change_v2(crop_path_pool, model, device):
     v2 = l2_norm(model(target))
     v2 = v2.detach_()
     return v2
-
 
 # 单次迭代
 def iter_noise(noise, img_origin, gaussian_blur, model, v2, lr=1, is_v2_self=False):
@@ -72,7 +67,6 @@ def iter_noise(noise, img_origin, gaussian_blur, model, v2, lr=1, is_v2_self=Fal
     loss.backward()
     print(loss1.item(), loss2.item() * 128 / 112, loss3.item(), noise.grad.abs().sum())
     
-
     if is_v2_self:
         lr = 0.5 * lr
     if loss1 < 0.5:
@@ -83,7 +77,6 @@ def iter_noise(noise, img_origin, gaussian_blur, model, v2, lr=1, is_v2_self=Fal
     noise = (noise + img_origin).clamp_(-1, 1) - img_origin
     noise = noise.clamp_(-0.2, 0.2)
     return noise
-
 
 # 多次迭代
 # m 几次换模型， n 基础换目标样本
@@ -105,7 +98,6 @@ def get_noise(model_pool, img_origin, gaussian_blur, target_face_pool, same_pers
         yield noise
         i += 1 
 
-
 # 初始化模型
 def init_model(model, param, device):
     m = model([112,112])
@@ -114,14 +106,12 @@ def init_model(model, param, device):
     m.load_state_dict(torch.load(param))
     return m
 
-
 # 初始化图片池
 def get_img_pool(person_list, device):
     person_pool = []
     for el in person_list:
         person_pool.append(utils.to_torch_tensor(Image.open(el)).unsqueeze_(0).to(device))
     return person_pool
-
 
 #初始化模型池
 def get_model_pool(device):
@@ -133,7 +123,6 @@ def get_model_pool(device):
     model_pool.append(init_model(ResNet_101, 'models/Backbone_ResNet_101_Epoch_4_Batch_90976_Time_2019-08-04-11-34_checkpoint.pth', device))
     return model_pool
  
-
 # 产生一个对抗样本 
 def main(origin_name, target_name, model_pool, device):
         
@@ -172,7 +161,6 @@ def main(origin_name, target_name, model_pool, device):
         noise = next(generator)    
     
     return gaussian_blur(noise), img_origin
-
 
 # 单GPU运行，产生多个对抗样本
 def one_card_run(people_list, crop_paths, device): 
